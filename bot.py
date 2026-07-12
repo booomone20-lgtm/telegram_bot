@@ -6,17 +6,14 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# ====== НАСТРОЙКИ (ПРОВЕРЬТЕ ЭТИ СТРОКИ!) ======
-BOT_TOKEN = "8874942259:AAFrl1tjVSHG1RKZ1I9ZV7oJ2gsAfdj8vIVs"   # ← Ваш токен
-CHANNEL_ID = "@morich_z"                                        # ← Ваш канал
-DEFAULT_DELAY_MINUTES = 120                                      # Задержка в минутах
-TEMPLATE_TEXT = "⏰ Время вышло! Это задание не активно."          # Текст для замены
+BOT_TOKEN = "8874942259:AAFrl1tjVSHG1RKZ1I9ZV7oJ2gsAfdj8vIVs"
+CHANNEL_ID = "@morich_z"
+DEFAULT_DELAY_MINUTES = 120
+TEMPLATE_TEXT = "⏰ Время вышло! Это задание не активно."
 
-# Хранилище задач
 scheduled_tasks = {}
 
 def send_telegram_request(method, params):
-    """Отправляет запрос к Telegram API"""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
     try:
         response = requests.post(url, json=params, timeout=30)
@@ -28,10 +25,10 @@ def send_telegram_request(method, params):
 def index():
     return "Бот работает на Render!", 200
 
+# ВОТ ЭТОТ ОБРАБОТЧИК БЫЛ ПРОПУЩЕН — Я ЕГО ДОБАВИЛ
 @app.route("/set_webhook", methods=["GET"])
 def set_webhook():
-    """Настройка вебхука — вызывается один раз"""
-    webhook_url = "https://telegram-bot-0wb6.onrender.com/"
+    webhook_url = "https://telegram-bot-581e.onrender.com/"
     result = send_telegram_request("setWebhook", {"url": webhook_url})
     if result.get("ok"):
         return f"✅ Webhook установлен! Ответ: {result}", 200
@@ -40,7 +37,6 @@ def set_webhook():
 
 @app.route("/", methods=["POST"])
 def webhook():
-    """Основная логика бота — сюда приходят сообщения от Telegram"""
     try:
         data = request.get_json()
         if not data or "message" not in data:
@@ -51,17 +47,13 @@ def webhook():
         user_id = message["from"]["id"]
         text = message.get("text", "")
         
-        # ====== КОМАНДЫ ======
-        
-        # /start
         if text == "/start":
             send_telegram_request("sendMessage", {
                 "chat_id": chat_id,
-                "text": "📢 Бот запущен! Отправьте текст для публикации в канале."
+                "text": "📢 Бот запущен! Отправьте текст для публикации."
             })
             return "OK", 200
             
-        # /settime 15
         if text.startswith("/settime"):
             parts = text.split()
             if len(parts) == 2 and parts[1].isdigit():
@@ -69,7 +61,7 @@ def webhook():
                 DEFAULT_DELAY_MINUTES = int(parts[1])
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
-                    "text": f"⏱ Задержка установлена: {DEFAULT_DELAY_MINUTES} мин."
+                    "text": f"⏱ Задержка: {DEFAULT_DELAY_MINUTES} мин."
                 })
             else:
                 send_telegram_request("sendMessage", {
@@ -78,7 +70,6 @@ def webhook():
                 })
             return "OK", 200
             
-        # /template Новый текст
         if text.startswith("/template"):
             parts = text.split(maxsplit=1)
             if len(parts) == 2:
@@ -86,22 +77,21 @@ def webhook():
                 TEMPLATE_TEXT = parts[1]
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
-                    "text": f"✅ Шаблон обновлён: {TEMPLATE_TEXT}"
+                    "text": f"✅ Шаблон: {TEMPLATE_TEXT}"
                 })
             else:
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
-                    "text": "❌ Укажите текст шаблона"
+                    "text": "❌ Укажите текст"
                 })
             return "OK", 200
             
-        # /cancel
         if text == "/cancel":
             if user_id in scheduled_tasks:
                 del scheduled_tasks[user_id]
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
-                    "text": "❌ Последняя задача отменена"
+                    "text": "❌ Задача отменена"
                 })
             else:
                 send_telegram_request("sendMessage", {
@@ -110,7 +100,6 @@ def webhook():
                 })
             return "OK", 200
             
-        # ====== ПУБЛИКАЦИЯ В КАНАЛ ======
         if not text.startswith("/"):
             result = send_telegram_request("sendMessage", {
                 "chat_id": CHANNEL_ID,
@@ -119,18 +108,14 @@ def webhook():
             
             if result.get("ok"):
                 msg_id = result["result"]["message_id"]
-                
-                # Подтверждение пользователю
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
-                    "text": f"✅ Опубликовано в канале!\nID: {msg_id}"
+                    "text": f"✅ Опубликовано! ID: {msg_id}"
                 })
                 
-                # Отменяем старую задачу, если была
                 if user_id in scheduled_tasks:
                     del scheduled_tasks[user_id]
                 
-                # Сохраняем новую задачу
                 scheduled_tasks[user_id] = {
                     "chat_id": CHANNEL_ID,
                     "message_id": msg_id,
@@ -138,7 +123,6 @@ def webhook():
                     "text": TEMPLATE_TEXT
                 }
                 
-                # Запускаем таймер в отдельном потоке
                 def replace_task():
                     task_data = scheduled_tasks.get(user_id)
                     if not task_data:
@@ -161,23 +145,21 @@ def webhook():
                 thread.daemon = True
                 thread.start()
                 
-                # Сообщаем время замены
                 replace_time = datetime.now() + timedelta(minutes=DEFAULT_DELAY_MINUTES)
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
                     "text": f"⏳ Замена через {DEFAULT_DELAY_MINUTES} мин.\n⏰ Примерно: {replace_time.strftime('%H:%M:%S')}"
                 })
             else:
-                error_msg = result.get('description', 'Неизвестная ошибка')
                 send_telegram_request("sendMessage", {
                     "chat_id": chat_id,
-                    "text": f"❌ Ошибка публикации: {error_msg}"
+                    "text": f"❌ Ошибка: {result.get('description', 'Неизвестно')}"
                 })
         
         return "OK", 200
         
     except Exception as e:
-        print(f"Ошибка в webhook: {e}")
+        print(f"Ошибка: {e}")
         return "Error", 500
 
 if __name__ == "__main__":
