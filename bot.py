@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-BOT_TOKEN = "8874942259:AAFrl1tjVSHG1RKZ1I9ZV7oJ2gsAfdj8vIVs"
+BOT_TOKEN = "8874942259:AAFr1tjVSHMGIRKZT9ZV7oJ2gsAfdi0vIVs"
 CHANNEL_ID = "@morich_z"
 DEFAULT_DELAY_MINUTES = 120
 TEMPLATE_TEXT = "⏰ Время вышло! Это задание не активно."
